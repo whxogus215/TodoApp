@@ -32,22 +32,6 @@ app.get('/writing', function(req, res){
     res.render('write.ejs');
 });
 
-// form에서 Post 요청한 정보 (할일, 마감 날짜)는 req에 저장되어 있음
-// 데이터마다 고유한 id를 부여하기 위해 총 게시물 갯수 + 1을 함!(총 게시물 갯수는 새로운 Collection으로 관리)
-app.post('/newpost', function(req, res){
-    // res.send('전송완료');
-    db.collection('counter').findOne({name : '게시물 갯수'}, function(에러, 결과){
-        var 총게시물갯수 = 결과.totalPost;
-
-        db.collection('post').insertOne({ _id : 총게시물갯수 + 1, 제목 : req.body.title, 날짜 : req.body.date} ,function(){
-            console.log('저장완료');
-            db.collection('counter').updateOne({name : '게시물 갯수'},{ $inc : {totalPost:1} },function(에러, 결과){
-                if(에러) return console.log(에러);
-            })  // $inc : DB Update Operater
-        });
-    });
-});
-
 app.get('/list', function(요청,응답){
     db.collection('post').find().toArray(function(에러, 결과){
         console.log(결과);
@@ -72,16 +56,6 @@ app.get('/search', (요청, 응답)=>{
     db.collection('post').aggregate(검색조건).toArray((에러, 결과)=>{
     console.log(결과)
     응답.render('search.ejs', {data : 결과})
-    })
-})
-
-app.delete('/delete/:id', function(요청,응답){
-    db.collection('post').deleteOne(요청.body, function(에러, 결과){
-        if (결과 == null) 응답.send('응 없어.');
-        // 터미널 창에 출력
-        console.log('삭제완료');
-        // 서버가 동작했을 때 반드시 무언가 응답을 해줘야 한다.
-        응답.status(200).send({ message : '성공했습니다'});
     })
 })
 
@@ -172,3 +146,44 @@ passport.deserializeUser(function(아이디, done){
     })
 });
 
+app.post('/register', function(요청, 응답){
+    db.collection('login').insertOne( { id : 요청.body.id, pw : 요청.body.pw }, function(에러, 결과){
+        응답.redirect('/')
+    });
+
+})
+
+// form에서 Post 요청한 정보 (할일, 마감 날짜)는 req에 저장되어 있음
+// 데이터마다 고유한 id를 부여하기 위해 총 게시물 갯수 + 1을 함!(총 게시물 갯수는 새로운 Collection으로 관리)
+app.post('/newpost', function(req, res){
+    res.send('전송완료');
+    db.collection('counter').findOne({name : '게시물 갯수'}, function(에러, 결과){
+        var 총게시물갯수 = 결과.totalPost;
+        var 저장할거 = { _id : 총게시물갯수 + 1, 제목 : req.body.title, 날짜 : req.body.date, 작성자 : req.user._id }
+
+        db.collection('post').insertOne(저장할거 ,function(){
+            console.log('저장완료');
+            db.collection('counter').updateOne({name : '게시물 갯수'},{ $inc : {totalPost:1} },function(에러, 결과){
+                if(에러) return console.log(에러);
+            })  // $inc : DB Update Operater
+        });
+    });
+});
+
+app.delete('/delete', function(요청,응답){
+    console.log(요청.body);
+    요청.body._id = parseInt(요청.body._id);
+
+    var 삭제할데이터 = { _id : 요청.body._id, 작성자 : 요청.user._id }
+    db.collection('post').deleteOne(삭제할데이터, function(에러, 결과){
+        if (결과 == null) 응답.send('응 없어.');
+        // 터미널 창에 출력
+        console.log('삭제완료');
+        // 서버가 동작했을 때 반드시 무언가 응답을 해줘야 한다.
+        응답.status(200).send({ message : '성공했습니다'});
+    })
+})
+
+// 전역 미들웨어
+app.use('/shop', require('./routes/shop.js'));
+app.use('/board/sub', require('./routes/board.js'));
